@@ -4,8 +4,11 @@ export async function fetchCustomCategories({ email, token, orcamentoId }) {
   if (!SCRIPT_URL || !email || !token || !orcamentoId) return [];
 
   try {
-    const url = `${SCRIPT_URL}?type=categorias&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}&orcamentoId=${encodeURIComponent(orcamentoId)}`;
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'listCategorias', email, token, orcamentoId }),
+    });
     if (!response.ok) return [];
 
     const result = await response.json();

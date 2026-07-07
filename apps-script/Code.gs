@@ -22,42 +22,6 @@
 
 const NOME_DA_ABA = 'Pagina1'; // aba de gastos — troque se tiver outro nome
 
-function doGet(e) {
-  try {
-    const tipo = e.parameter.type;
-    const email = e.parameter.email;
-    const token = e.parameter.token;
-    const orcamentoId = e.parameter.orcamentoId;
-
-    const planilha = SpreadsheetApp.getActiveSpreadsheet();
-    const sessao = validarSessao(planilha, email, token);
-    if (!sessao.valido) {
-      return respostaJson({ status: 'erro', message: sessao.message });
-    }
-
-    if (tipo === 'orcamentos') {
-      return respostaJson({ status: 'ok', rows: listarOrcamentosDoUsuario(planilha, sessao.email) });
-    }
-    if (tipo === 'gastos') {
-      const permissao = validarMembro(planilha, sessao.email, orcamentoId);
-      if (!permissao.valido) return respostaJson({ status: 'erro', message: permissao.message });
-      return respostaJson({ status: 'ok', rows: listarGastos(planilha, orcamentoId) });
-    }
-    if (tipo === 'categorias') {
-      const permissao = validarMembro(planilha, sessao.email, orcamentoId);
-      if (!permissao.valido) return respostaJson({ status: 'erro', message: permissao.message });
-      return respostaJson({ status: 'ok', rows: listarCategorias(planilha, orcamentoId) });
-    }
-    if (tipo === 'meusGastos') {
-      return respostaJson({ status: 'ok', rows: listarMeusGastos(planilha, sessao.email) });
-    }
-
-    return respostaJson({ status: 'erro', message: 'Tipo de consulta desconhecido.' });
-  } catch (err) {
-    return respostaJson({ status: 'erro', message: 'Erro no script: ' + err.message });
-  }
-}
-
 function doPost(e) {
   try {
     const dados = JSON.parse(e.postData.contents);
@@ -75,6 +39,27 @@ function doPost(e) {
     if (acao === 'criarOrcamento') return criarOrcamento(planilha, dados, sessao.email);
     if (acao === 'entrarOrcamento') return entrarOrcamento(planilha, dados, sessao.email);
     if (acao === 'feedback') return salvarFeedback(planilha, dados);
+
+    // Leituras — antes eram feitas via doGet, mas fetch() cross-origin pra
+    // esse tipo de requisição no Apps Script tem um bug conhecido do Google
+    // (a URL de redirecionamento do conteúdo às vezes retorna 404). Usar
+    // POST pra tudo, como já fazíamos nas escritas, evita esse problema.
+    if (acao === 'listOrcamentos') {
+      return respostaJson({ status: 'ok', rows: listarOrcamentosDoUsuario(planilha, sessao.email) });
+    }
+    if (acao === 'listMeusGastos') {
+      return respostaJson({ status: 'ok', rows: listarMeusGastos(planilha, sessao.email) });
+    }
+    if (acao === 'listGastos') {
+      const permissao = validarMembro(planilha, sessao.email, dados.orcamentoId);
+      if (!permissao.valido) return respostaJson({ status: 'erro', message: permissao.message });
+      return respostaJson({ status: 'ok', rows: listarGastos(planilha, dados.orcamentoId) });
+    }
+    if (acao === 'listCategorias') {
+      const permissao = validarMembro(planilha, sessao.email, dados.orcamentoId);
+      if (!permissao.valido) return respostaJson({ status: 'erro', message: permissao.message });
+      return respostaJson({ status: 'ok', rows: listarCategorias(planilha, dados.orcamentoId) });
+    }
 
     // Ações abaixo mexem em gastos/categorias de um orçamento específico —
     // todas exigem que o usuário seja membro dele.

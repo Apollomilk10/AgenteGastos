@@ -1,11 +1,5 @@
 const SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL;
 
-/**
- * Lê os gastos do espaço do usuário logado, direto do Apps Script
- * (não usa mais CSV publicado — a filtragem por espaço acontece no
- * próprio script, então cada usuário só recebe os dados do seu grupo).
- */
-
 function parseValorBR(raw) {
   if (typeof raw === 'number') return raw;
   if (!raw) return 0;
@@ -31,6 +25,26 @@ function parseDataBR(raw) {
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
+async function fetchComTimeout(payload, ms = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('O servidor demorou demais para responder (mais de 15s). Tente novamente.');
+    }
+    throw new Error('Não foi possível conectar ao servidor. Confira sua internet.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function fetchGastos({ email, token, orcamentoId }) {
   if (!SCRIPT_URL) {
     throw new Error('VITE_APPS_SCRIPT_URL não configurada. Veja o README para instruções.');
@@ -42,13 +56,18 @@ export async function fetchGastos({ email, token, orcamentoId }) {
     throw new Error('Nenhum orçamento selecionado.');
   }
 
-  const url = `${SCRIPT_URL}?type=gastos&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}&orcamentoId=${encodeURIComponent(orcamentoId)}`;
-  const response = await fetch(url, { cache: 'no-store' });
+  const response = await fetchComTimeout({ action: 'listGastos', email, token, orcamentoId });
   if (!response.ok) {
     throw new Error(`Falha ao buscar os gastos (status ${response.status}).`);
   }
 
-  const result = await response.json();
+  const rawText = await response.text();
+  let result;
+  try {
+    result = JSON.parse(rawText);
+  } catch {
+    throw new Error('O Apps Script não retornou um JSON válido. Publique uma "Nova versão" da implantação.');
+  }
   if (result.status !== 'ok') {
     throw new Error(result.message || 'Erro ao buscar os gastos.');
   }

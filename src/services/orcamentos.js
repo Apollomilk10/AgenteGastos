@@ -1,10 +1,15 @@
 const SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL;
 
-async function fetchComTimeout(url, ms = 15000) {
+async function fetchComTimeout(payload, ms = 15000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ms);
   try {
-    const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
     return response;
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -17,11 +22,10 @@ async function fetchComTimeout(url, ms = 15000) {
 }
 
 async function callScript(payload) {
-  const response = await fetch(SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(payload),
-  });
+  const response = await fetchComTimeout(payload);
+  if (!response.ok) {
+    throw new Error(`O servidor respondeu com erro (status ${response.status}).`);
+  }
   const rawText = await response.text();
   let result;
   try {
@@ -36,21 +40,7 @@ async function callScript(payload) {
 }
 
 export async function fetchOrcamentos({ email, token }) {
-  const url = `${SCRIPT_URL}?type=orcamentos&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
-  const response = await fetchComTimeout(url);
-  if (!response.ok) {
-    throw new Error(`O servidor respondeu com erro (status ${response.status}).`);
-  }
-  const rawText = await response.text();
-  let result;
-  try {
-    result = JSON.parse(rawText);
-  } catch {
-    throw new Error(
-      'A resposta do Apps Script não é um JSON válido — provavelmente é preciso publicar uma "Nova versão" da implantação, ou a permissão de acesso não está como "Qualquer pessoa".'
-    );
-  }
-  if (result.status !== 'ok') throw new Error(result.message);
+  const result = await callScript({ action: 'listOrcamentos', email, token });
   return result.rows;
 }
 
@@ -63,9 +53,6 @@ export function entrarOrcamento(codigo, session) {
 }
 
 export async function fetchMeusGastos({ email, token }) {
-  const url = `${SCRIPT_URL}?type=meusGastos&email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
-  const response = await fetch(url, { cache: 'no-store' });
-  const result = await response.json();
-  if (result.status !== 'ok') throw new Error(result.message);
+  const result = await callScript({ action: 'listMeusGastos', email, token });
   return result.rows;
 }
