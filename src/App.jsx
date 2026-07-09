@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Menu, LogOut } from 'lucide-react';
-import { fetchGastos } from './services/sheets';
+import { fetchGastosAgregados } from './services/sheets';
 import { useAuth } from './context/AuthContext';
 import { useOrcamentos } from './context/OrcamentosContext';
 import LoginScreen from './components/LoginScreen';
@@ -19,8 +19,13 @@ import './styles.css';
 const REFRESH_MS = 60_000;
 
 export default function App() {
-  const { isAuthenticated, initializing, email, logout } = useAuth();
-  const { activeId, active, loading: orcamentosLoading, error: orcamentosError, reload: reloadOrcamentos } = useOrcamentos();
+  const { isAuthenticated, initializing, logout } = useAuth();
+  const {
+    orcamentos,
+    loading: orcamentosLoading,
+    error: orcamentosError,
+    reload: reloadOrcamentos,
+  } = useOrcamentos();
 
   const [rows, setRows] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | error
@@ -42,9 +47,9 @@ export default function App() {
   }, [orcamentosLoading]);
 
   async function load() {
-    if (!activeId) return;
+    if (orcamentos.length === 0) return;
     try {
-      const data = await fetchGastos({ orcamentoId: activeId });
+      const data = await fetchGastosAgregados(orcamentos);
       setRows(data);
       setStatus('ready');
     } catch (err) {
@@ -54,13 +59,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!isAuthenticated || !activeId) return;
+    if (!isAuthenticated || orcamentos.length === 0) return;
     setStatus('loading');
     load();
     const interval = setInterval(load, REFRESH_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, activeId]);
+  }, [isAuthenticated, orcamentos.map((o) => o.id).join(',')]);
 
   const rowsMemo = useMemo(() => rows, [rows]);
 
@@ -72,12 +77,12 @@ export default function App() {
     return <LoginScreen />;
   }
 
-  if (orcamentosLoading || (status === 'loading' && !activeId)) {
+  if (orcamentosLoading || (status === 'loading' && orcamentos.length === 0)) {
     if (travado) {
       return (
         <StatusScreen
           title="Isso está demorando mais que o esperado"
-          subtitle="Pode ser instabilidade no Apps Script. Tente recarregar a página."
+          subtitle="Pode ser que o servidor esteja iniciando (comum no plano gratuito). Tente recarregar em alguns segundos."
           isError
         >
           <button className="primary-button" onClick={() => window.location.reload()}>
@@ -86,7 +91,7 @@ export default function App() {
         </StatusScreen>
       );
     }
-    return <StatusScreen title="Carregando seus orçamentos…" />;
+    return <StatusScreen title="Carregando seu espaço…" />;
   }
 
   if (orcamentosError) {
@@ -99,7 +104,7 @@ export default function App() {
     );
   }
 
-  if (!activeId) {
+  if (orcamentos.length === 0) {
     return (
       <StatusScreen
         title="Você ainda não está em nenhum orçamento"
@@ -109,7 +114,7 @@ export default function App() {
   }
 
   if (status === 'loading') {
-    return <StatusScreen title="Carregando dados do orçamento…" />;
+    return <StatusScreen title="Carregando seus dados…" />;
   }
 
   if (status === 'error') {
@@ -129,18 +134,14 @@ export default function App() {
 
   return (
     <div className="page">
-      <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onOpenProfile={() => setShowProfile(true)}
-      />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} onOpenProfile={() => setShowProfile(true)} />
 
       <header className="app-header">
         <div className="app-header__top">
           <button className="icon-button" onClick={() => setSidebarOpen(true)} aria-label="Abrir menu">
             <Menu size={18} />
           </button>
-          <span className="mono eyebrow app-header__title">{active?.nome || 'ORÇAMENTO'}</span>
+          <span className="mono eyebrow app-header__title">MEU ESPAÇO</span>
           <div className="app-header__actions">
             <RefreshButton onRefresh={handleForceRefresh} refreshing={refreshing} />
             <button className="icon-button" onClick={logout} aria-label="Sair">
@@ -164,9 +165,7 @@ export default function App() {
           {activeTab === 'insights' && <InsightsTab rows={rowsMemo} />}
           {activeTab === 'manage' && <ManageTab rows={rowsMemo} onChanged={load} />}
 
-          <footer className="footer mono">
-            atualiza automaticamente a cada 60s
-          </footer>
+          <footer className="footer mono">atualiza automaticamente a cada 60s</footer>
 
           <NewExpenseForm onSaved={load} />
           <FeedbackButton />

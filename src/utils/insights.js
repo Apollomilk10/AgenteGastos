@@ -100,10 +100,25 @@ export function projecaoTotal(rows, orcamento) {
 }
 
 /**
- * Série acumulada (ritmo de gastos) — soma corrida do total gasto dia a
- * dia, do primeiro lançamento até hoje. Ajuda a visualizar a velocidade
- * com que o dinheiro está sendo gasto ao longo do tempo.
+ * Os N maiores gastos, do maior pro menor.
  */
+export function topExpenses(rows, n = 5) {
+  return [...rows].sort((a, b) => b.valor - a.valor).slice(0, n);
+}
+
+/**
+ * Soma de gastos por dia da semana (0 = domingo ... 6 = sábado) — ajuda a
+ * enxergar em quais dias o dinheiro costuma sair mais.
+ */
+export function weekdaySeries(rows) {
+  const nomes = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const totals = new Array(7).fill(0);
+  rows.forEach((r) => {
+    if (!r.data) return;
+    totals[r.data.getDay()] += r.valor;
+  });
+  return nomes.map((label, i) => ({ label, total: totals[i] }));
+}
 export function cumulativeSeries(rows) {
   const comData = rows.filter((r) => r.data).sort((a, b) => a.data.getTime() - b.data.getTime());
   if (comData.length === 0) return [];

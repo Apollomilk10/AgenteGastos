@@ -13,17 +13,15 @@ function parseDataBR(raw) {
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
-export async function fetchGastos({ orcamentoId }) {
-  if (!orcamentoId) {
-    throw new Error('Nenhum orçamento selecionado.');
-  }
-
-  const result = await apiGet(`/orcamentos/${orcamentoId}/gastos`);
+export async function fetchGastosDeOrcamento(orcamento) {
+  const result = await apiGet(`/orcamentos/${orcamento.id}/gastos`);
 
   return result.rows
     .map((row) => ({
       id: row.id,
       rowNumber: row.id,
+      orcamentoId: orcamento.id,
+      orcamentoNome: orcamento.nome,
       data: parseDataBR(row.data),
       categoria: (row.categoria || 'Sem categoria').toString().trim(),
       descricao: (row.descricao || '').toString().trim(),
@@ -32,4 +30,13 @@ export async function fetchGastos({ orcamentoId }) {
       etapa: (row.etapa || 'Sem etapa').toString().trim(),
     }))
     .filter((row) => row.valor > 0 || row.descricao);
+}
+
+/**
+ * Busca os gastos de TODOS os orçamentos informados e junta tudo numa
+ * lista só — é assim que "Meu espaço" mostra a visão combinada.
+ */
+export async function fetchGastosAgregados(orcamentos) {
+  const listas = await Promise.all(orcamentos.map(fetchGastosDeOrcamento));
+  return listas.flat();
 }

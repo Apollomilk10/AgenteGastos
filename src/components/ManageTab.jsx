@@ -2,15 +2,10 @@ import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import TagIcon from './TagIcon';
 import EditExpenseSheet from './EditExpenseSheet';
-import { useAuth } from '../context/AuthContext';
-import { useOrcamentos } from '../context/OrcamentosContext';
 import { useCategories } from '../context/CategoriesContext';
 import { deleteGasto } from '../services/appsScript';
 
 export default function ManageTab({ rows, onChanged }) {
-  const auth = useAuth();
-  const { activeId } = useOrcamentos();
-  const session = { ...auth, orcamentoId: activeId };
   const { getCategoryMeta, getSubcategoryMeta } = useCategories();
   const [editing, setEditing] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
@@ -23,7 +18,7 @@ export default function ManageTab({ rows, onChanged }) {
     setDeleting(true);
     setError('');
     try {
-      await deleteGasto(row.rowNumber, session);
+      await deleteGasto(row.rowNumber, { orcamentoId: row.orcamentoId });
       setConfirmingId(null);
       onChanged?.();
     } catch (err) {

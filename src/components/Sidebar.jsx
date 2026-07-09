@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { X, Plus, LogIn, Wallet, User, Check } from 'lucide-react';
+import { X, Plus, LogIn, Wallet, User, Trash2, Copy, Check } from 'lucide-react';
 import { useOrcamentos } from '../context/OrcamentosContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ open, onClose, onOpenProfile }) {
-  const { orcamentos, activeId, switchOrcamento, criarOrcamento, entrarOrcamento } = useOrcamentos();
+  const { orcamentos, criarOrcamento, entrarOrcamento, excluirOrcamento } = useOrcamentos();
+  const { uid } = useAuth();
   const [modo, setModo] = useState(null); // null | 'criar' | 'entrar'
   const [valor, setValor] = useState('');
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState('');
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [copiadoId, setCopiadoId] = useState('');
 
   function fecharFormulario() {
     setModo(null);
@@ -27,7 +32,6 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
         await entrarOrcamento(valor.trim());
       }
       fecharFormulario();
-      onClose();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -35,9 +39,22 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
     }
   }
 
-  function handleSelect(id) {
-    switchOrcamento(id);
-    onClose();
+  async function handleDelete(orcamentoId) {
+    setDeletingId(orcamentoId);
+    try {
+      await excluirOrcamento(orcamentoId);
+      setConfirmingId(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function copiarCodigo(codigo) {
+    navigator.clipboard.writeText(codigo);
+    setCopiadoId(codigo);
+    setTimeout(() => setCopiadoId(''), 2000);
   }
 
   return (
@@ -51,19 +68,61 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
           </button>
         </div>
 
+        <p className="text-muted" style={{ fontSize: 12, margin: '-8px 0 0' }}>
+          "Meu espaço" mostra todos somados. Aqui você gerencia cada um.
+        </p>
+
         <div className="sidebar__list">
-          {orcamentos.map((orc) => (
-            <button
-              key={orc.id}
-              className={`sidebar__item ${orc.id === activeId ? 'sidebar__item--active' : ''}`}
-              onClick={() => handleSelect(orc.id)}
-            >
-              <Wallet size={16} />
-              <span className="sidebar__item-name">{orc.nome}</span>
-              {orc.id === activeId && <Check size={15} />}
-            </button>
-          ))}
+          {orcamentos.map((orc) => {
+            const souDono = orc.criadoPorUid === uid;
+            const isConfirming = confirmingId === orc.id;
+
+            return (
+              <div key={orc.id} className="sidebar__item">
+                <Wallet size={16} />
+                <div className="sidebar__item-main">
+                  <span className="sidebar__item-name">{orc.nome}</span>
+                  <button
+                    type="button"
+                    className="sidebar__item-code mono"
+                    onClick={() => copiarCodigo(orc.codigo)}
+                  >
+                    {copiadoId === orc.codigo ? <Check size={11} /> : <Copy size={11} />}
+                    {orc.codigo}
+                  </button>
+                </div>
+
+                {souDono && (
+                  isConfirming ? (
+                    <div className="confirm-delete">
+                      <button
+                        type="button"
+                        className="confirm-delete__yes"
+                        disabled={deletingId === orc.id}
+                        onClick={() => handleDelete(orc.id)}
+                      >
+                        {deletingId === orc.id ? '...' : 'excluir'}
+                      </button>
+                      <button type="button" className="confirm-delete__no" onClick={() => setConfirmingId(null)}>
+                        não
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="icon-button icon-button--danger"
+                      onClick={() => setConfirmingId(orc.id)}
+                      aria-label="Excluir orçamento"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        {error && <p className="field-error">{error}</p>}
 
         {modo ? (
           <form className="sidebar__form" onSubmit={handleSubmit}>
@@ -74,7 +133,6 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
               placeholder={modo === 'criar' ? 'Nome do orçamento' : 'Código do orçamento'}
               autoFocus
             />
-            {error && <p className="field-error">{error}</p>}
             <div className="sidebar__form-actions">
               <button type="submit" className="primary-button" disabled={status === 'saving'}>
                 {status === 'saving' ? '...' : 'confirmar'}

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { fetchCustomCategories } from '../services/categoriesSheet';
+import { fetchCustomCategoriesAgregadas } from '../services/categoriesSheet';
 import { addCategoria as addCategoriaApi } from '../services/appsScript';
 import { useAuth } from './AuthContext';
 import { useOrcamentos } from './OrcamentosContext';
@@ -18,26 +18,36 @@ const CategoriesContext = createContext(null);
 
 export function CategoriesProvider({ children }) {
   const { isAuthenticated } = useAuth();
-  const { activeId } = useOrcamentos();
+  const { orcamentos } = useOrcamentos();
   const [tree, setTree] = useState(BUILTIN_CATEGORY_TREE);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
-    if (!isAuthenticated || !activeId) return;
-    const custom = await fetchCustomCategories({ orcamentoId: activeId });
+    if (!isAuthenticated || orcamentos.length === 0) return;
+    const custom = await fetchCustomCategoriesAgregadas(orcamentos);
     setTree(mergeCategoryTree(custom));
     setLoading(false);
-  }, [isAuthenticated, activeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, orcamentos.map((o) => o.id).join(',')]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
+  // Novas categorias/subcategorias sempre entram no primeiro orçamento do
+  // usuário (na prática, quase sempre a única) — como a visão é agregada,
+  // elas aparecem pra todo mundo que participa de qualquer orçamento dela.
+  function orcamentoDestino() {
+    return orcamentos[0]?.id;
+  }
+
   async function addCategory(categoriaLabel) {
     const categoriaChave = slugify(categoriaLabel);
+    const orcamentoId = orcamentoDestino();
+    if (!orcamentoId) throw new Error('Você precisa estar em pelo menos um orçamento.');
     await addCategoriaApi(
       { categoriaChave, categoriaLabel, subcategoriaChave: '', subcategoriaLabel: '' },
-      { orcamentoId: activeId }
+      { orcamentoId }
     );
     await reload();
     return categoriaChave;
@@ -46,6 +56,8 @@ export function CategoriesProvider({ children }) {
   async function addSubcategory(categoriaChave, subcategoriaLabel) {
     const cat = tree[categoriaChave];
     const subcategoriaChave = slugify(subcategoriaLabel);
+    const orcamentoId = orcamentoDestino();
+    if (!orcamentoId) throw new Error('Você precisa estar em pelo menos um orçamento.');
     await addCategoriaApi(
       {
         categoriaChave,
@@ -53,7 +65,7 @@ export function CategoriesProvider({ children }) {
         subcategoriaChave,
         subcategoriaLabel,
       },
-      { orcamentoId: activeId }
+      { orcamentoId }
     );
     await reload();
     return subcategoriaChave;

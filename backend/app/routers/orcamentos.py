@@ -69,5 +69,30 @@ async def listar_meus_orcamentos(user: dict = Depends(get_current_user)):
                 "id": doc.id,
                 "nome": data.get("nome"),
                 "codigo": data.get("codigo"),
+                "criadoPorUid": data.get("criadoPorUid"),
             })
     return {"rows": resultado}
+
+
+@router.delete("/{orcamento_id}")
+async def excluir_orcamento(orcamento_id: str, user: dict = Depends(get_current_user)):
+    doc_ref = db.collection("orcamentos").document(orcamento_id)
+    doc = doc_ref.get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Orçamento não encontrado.")
+
+    if doc.to_dict().get("criadoPorUid") != user["uid"]:
+        raise HTTPException(status_code=403, detail="Só quem criou o orçamento pode excluí-lo.")
+
+    # Limpeza em cascata: gastos, categorias e membros desse orçamento
+    for colecao in ("gastos", "categorias"):
+        docs = db.collection(colecao).where("orcamentoId", "==", orcamento_id).stream()
+        for d in docs:
+            d.reference.delete()
+
+    membros = db.collection("membros").where("orcamentoId", "==", orcamento_id).stream()
+    for m in membros:
+        m.reference.delete()
+
+    doc_ref.delete()
+    return {"status": "ok"}

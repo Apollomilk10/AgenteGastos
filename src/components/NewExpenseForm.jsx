@@ -1,26 +1,26 @@
 import { useState } from 'react';
 import { postGasto } from '../services/appsScript';
-import { useAuth } from '../context/AuthContext';
 import { useOrcamentos } from '../context/OrcamentosContext';
 import { useCategories } from '../context/CategoriesContext';
 import CategoryPicker from './CategoryPicker';
 import SubcategoryPicker from './SubcategoryPicker';
 
-const initialState = {
-  valor: '',
-  categoria: 'obra_reforma',
-  descricao: '',
-  etapa: 'nao_especificada',
-  responsavel: '',
-};
+function estadoInicial(orcamentos) {
+  return {
+    valor: '',
+    categoria: 'obra_reforma',
+    descricao: '',
+    etapa: 'nao_especificada',
+    responsavel: '',
+    orcamentoId: orcamentos[0]?.id || '',
+  };
+}
 
 export default function NewExpenseForm({ onSaved }) {
-  const auth = useAuth();
-  const { activeId } = useOrcamentos();
-  const session = { ...auth, orcamentoId: activeId };
+  const { orcamentos } = useOrcamentos();
   const { subcategoryOptions } = useCategories();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(initialState);
+  const [form, setForm] = useState(() => estadoInicial(orcamentos));
   const [status, setStatus] = useState('idle'); // idle | saving | error
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -33,21 +33,33 @@ export default function NewExpenseForm({ onSaved }) {
     setForm((prev) => ({ ...prev, categoria, etapa: options[0]?.value || '' }));
   }
 
+  function handleOpen() {
+    setForm(estadoInicial(orcamentos));
+    setOpen(true);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.valor || Number(form.valor) <= 0) return;
+    if (!form.orcamentoId) {
+      setErrorMessage('Escolha em qual orçamento salvar.');
+      setStatus('error');
+      return;
+    }
 
     setStatus('saving');
     try {
-      await postGasto({
-        data: new Date().toLocaleDateString('pt-BR'),
-        categoria: form.categoria,
-        descricao: form.descricao,
-        valor: Number(form.valor),
-        responsavel: form.responsavel,
-        etapa: form.etapa,
-      }, session);
-      setForm(initialState);
+      await postGasto(
+        {
+          data: new Date().toLocaleDateString('pt-BR'),
+          categoria: form.categoria,
+          descricao: form.descricao,
+          valor: Number(form.valor),
+          responsavel: form.responsavel,
+          etapa: form.etapa,
+        },
+        { orcamentoId: form.orcamentoId }
+      );
       setOpen(false);
       setStatus('idle');
       onSaved?.();
@@ -60,7 +72,7 @@ export default function NewExpenseForm({ onSaved }) {
 
   if (!open) {
     return (
-      <button className="fab" onClick={() => setOpen(true)} aria-label="Novo gasto">
+      <button className="fab" onClick={handleOpen} aria-label="Novo gasto">
         <span className="fab__icon">+</span>
         <span>Novo gasto</span>
       </button>
@@ -69,17 +81,26 @@ export default function NewExpenseForm({ onSaved }) {
 
   return (
     <div className="sheet-backdrop" onClick={() => setOpen(false)}>
-      <form
-        className="sheet"
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={handleSubmit}
-      >
+      <form className="sheet" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <div className="sheet__header">
           <h2>Novo gasto</h2>
           <button type="button" className="link-button mono" onClick={() => setOpen(false)}>
             fechar
           </button>
         </div>
+
+        {orcamentos.length > 1 && (
+          <label className="field">
+            <span>Orçamento</span>
+            <select value={form.orcamentoId} onChange={(e) => update('orcamentoId', e.target.value)}>
+              {orcamentos.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="field">
           <span>Valor</span>
@@ -117,11 +138,7 @@ export default function NewExpenseForm({ onSaved }) {
 
           <label className="field">
             <span>Subcategoria</span>
-            <SubcategoryPicker
-              categoria={form.categoria}
-              value={form.etapa}
-              onChange={(v) => update('etapa', v)}
-            />
+            <SubcategoryPicker categoria={form.categoria} value={form.etapa} onChange={(v) => update('etapa', v)} />
           </label>
         </div>
 
