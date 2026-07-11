@@ -20,14 +20,14 @@ function isoParaBR(iso) {
   return `${dia}/${mes}/${ano}`;
 }
 
-function estadoInicial(orcamentos, filtroId, nome) {
+function estadoInicial(orcamentos, filtroId, uid) {
   return {
     tipo: 'despesa',
     valor: '',
     categoria: 'obra_reforma',
     descricao: '',
     etapa: 'nao_especificada',
-    responsavel: nome || '',
+    responsavel: uid || '',
     orcamentoId: filtroId || orcamentos[0]?.id || '',
     sugestaoAplicada: false,
     data: hojeISO(),
@@ -38,10 +38,10 @@ function estadoInicial(orcamentos, filtroId, nome) {
 
 export default function NewExpenseForm({ onSaved }) {
   const { orcamentos, filtroId } = useOrcamentos();
-  const { nome } = useAuth();
+  const { nome, uid } = useAuth();
   const { subcategoryOptions } = useCategories();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState(() => estadoInicial(orcamentos, filtroId, nome));
+  const [form, setForm] = useState(() => estadoInicial(orcamentos, filtroId, uid));
   const [status, setStatus] = useState('idle'); // idle | saving | error
   const [errorMessage, setErrorMessage] = useState('');
   const { membros } = useMembros(form.orcamentoId);
@@ -67,7 +67,7 @@ export default function NewExpenseForm({ onSaved }) {
   }
 
   function handleOpen() {
-    setForm(estadoInicial(orcamentos, filtroId, nome));
+    setForm(estadoInicial(orcamentos, filtroId, uid));
     setOpen(true);
   }
 
@@ -226,9 +226,9 @@ export default function NewExpenseForm({ onSaved }) {
         <label className="field">
           <span>Quem</span>
           <select value={form.responsavel} onChange={(e) => update('responsavel', e.target.value)}>
-            {membros.length === 0 && nome && <option value={nome}>{nome}</option>}
+            {membros.length === 0 && uid && <option value={uid}>{nome}</option>}
             {membros.map((m) => (
-              <option key={m.uid} value={m.nome}>
+              <option key={m.uid} value={m.uid}>
                 {m.nome}
               </option>
             ))}

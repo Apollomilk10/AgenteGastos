@@ -31,7 +31,7 @@ export default function TransactionList({ rows }) {
                     <span className="transaction-row__desc">{row.descricao || catMeta.label}</span>
                     <span className="transaction-row__meta text-muted">
                       {catMeta.label} · {subMeta.label}
-                      {row.responsavel ? ` · ${row.responsavel}` : ''}
+                      {row.responsavelNome ? ` · ${row.responsavelNome}` : ''}
                       {row.status === 'projetado' ? ' · projetado' : ''}
                     </span>
                   </div>

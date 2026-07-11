@@ -54,6 +54,7 @@ export default function ManageTab({ rows, onChanged }) {
                 <span className="manage-row__desc">{row.descricao || catMeta.label}</span>
                 <span className="manage-row__meta text-muted">
                   {row.data ? row.data.toLocaleDateString('pt-BR') : 'sem data'} · {catMeta.label} · {subMeta.label}
+                  {row.responsavelNome ? ` · ${row.responsavelNome}` : ''}
                 </span>
               </div>
               <span className={`manage-row__valor mono ${row.tipo === 'receita' ? 'text-good' : 'text-danger'}`}>

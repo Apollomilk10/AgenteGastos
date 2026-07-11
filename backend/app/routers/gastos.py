@@ -10,15 +10,26 @@ from ..models import GastoInput
 router = APIRouter(tags=["gastos"])
 
 
-def _serializar(doc) -> dict:
+def _mapa_membros(orcamento_id: str) -> dict:
+    """uid -> nome atual, direto da aba de membros (sempre em dia com o
+    perfil, mesmo que o gasto tenha sido lançado há tempos)."""
+    docs = db.collection("membros").where("orcamentoId", "==", orcamento_id).stream()
+    return {d.to_dict().get("uid"): d.to_dict().get("nome") or d.to_dict().get("email") for d in docs}
+
+
+def _serializar(doc, membros_map: dict) -> dict:
     data = doc.to_dict()
+    responsavel = data.get("responsavel", "")
     return {
         "id": doc.id,
         "data": data.get("data", ""),
         "categoria": data.get("categoria", "outro"),
         "descricao": data.get("descricao", ""),
         "valor": data.get("valor", 0),
-        "responsavel": data.get("responsavel", ""),
+        "responsavel": responsavel,
+        # nome de exibição: resolvido AGORA a partir do perfil atual da
+        # pessoa declarada em "Quem" — nunca um nome "congelado" antigo
+        "responsavelNome": membros_map.get(responsavel, responsavel),
         "etapa": data.get("etapa", "nao_especificada"),
         "tipo": data.get("tipo", "despesa"),
         "status": data.get("status", "confirmado"),
@@ -30,8 +41,9 @@ def _serializar(doc) -> dict:
 @router.get("/orcamentos/{orcamento_id}/gastos")
 async def listar_gastos(orcamento_id: str, user: dict = Depends(get_current_user)):
     await exigir_membro(orcamento_id, user["uid"])
+    membros_map = _mapa_membros(orcamento_id)
     docs = db.collection("gastos").where("orcamentoId", "==", orcamento_id).stream()
-    rows = [_serializar(d) for d in docs]
+    rows = [_serializar(d, membros_map) for d in docs]
     return {"rows": rows}
 
 
@@ -49,7 +61,7 @@ async def criar_gasto(orcamento_id: str, body: GastoInput, user: dict = Depends(
         "categoria": body.categoria,
         "descricao": body.descricao,
         "valor": body.valor,
-        "responsavel": body.responsavel,
+        "responsavel": body.responsavel,  # uid de quem foi declarado em "Quem"
         "etapa": body.etapa,
         "tipo": body.tipo if body.tipo in ("despesa", "receita") else "despesa",
         "status": body.status if body.status in ("confirmado", "projetado") else "confirmado",
@@ -107,22 +119,25 @@ async def excluir_gasto(orcamento_id: str, gasto_id: str, user: dict = Depends(g
 @router.get("/orcamentos/{orcamento_id}/por-integrante")
 async def gastos_por_integrante(orcamento_id: str, user: dict = Depends(get_current_user)):
     await exigir_membro(orcamento_id, user["uid"])
+    membros_map = _mapa_membros(orcamento_id)
     docs = db.collection("gastos").where("orcamentoId", "==", orcamento_id).stream()
 
     resumo = {}
     for d in docs:
         data = d.to_dict()
-        uid = data.get("criadoPorUid") or "desconhecido"
-        nome = data.get("criadoPorNome") or data.get("criadoPorEmail") or "Desconhecido"
+        # Quebra por quem foi DECLARADO no campo "Quem" do lançamento —
+        # não por quem efetivamente cadastrou no app.
+        uid_declarado = data.get("responsavel") or "nao_informado"
+        nome = membros_map.get(uid_declarado, uid_declarado if uid_declarado != "nao_informado" else "Não informado")
         valor = data.get("valor", 0)
         tipo = data.get("tipo", "despesa")
 
-        if uid not in resumo:
-            resumo[uid] = {"uid": uid, "nome": nome, "despesas": 0, "receitas": 0}
+        if uid_declarado not in resumo:
+            resumo[uid_declarado] = {"uid": uid_declarado, "nome": nome, "despesas": 0, "receitas": 0}
         if tipo == "receita":
-            resumo[uid]["receitas"] += valor
+            resumo[uid_declarado]["receitas"] += valor
         else:
-            resumo[uid]["despesas"] += valor
+            resumo[uid_declarado]["despesas"] += valor
 
     return {"rows": list(resumo.values())}
 

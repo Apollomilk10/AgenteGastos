@@ -170,11 +170,11 @@ export default function EditExpenseSheet({ row, onClose, onSaved }) {
         <label className="field">
           <span>Quem</span>
           <select value={form.responsavel} onChange={(e) => update('responsavel', e.target.value)}>
-            {form.responsavel && !membros.some((m) => m.nome === form.responsavel) && (
-              <option value={form.responsavel}>{form.responsavel}</option>
+            {form.responsavel && !membros.some((m) => m.uid === form.responsavel) && (
+              <option value={form.responsavel}>{row.responsavelNome || form.responsavel}</option>
             )}
             {membros.map((m) => (
-              <option key={m.uid} value={m.nome}>
+              <option key={m.uid} value={m.uid}>
                 {m.nome}
               </option>
             ))}
