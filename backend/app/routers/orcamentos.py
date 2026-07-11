@@ -57,8 +57,38 @@ async def entrar_orcamento(body: EntrarOrcamento, user: dict = Depends(get_curre
     return {"orcamentoId": orcamento_id, "nome": nome}
 
 
+def _garantir_orcamento_pessoal(user: dict) -> str:
+    """Todo mundo tem um orçamento pessoal próprio, sempre presente,
+    marcado com pessoal=True. Criado na primeira vez que for necessário
+    (funciona tanto pra contas novas quanto pras que já existiam antes
+    dessa funcionalidade)."""
+    existentes = db.collection("orcamentos").where("criadoPorUid", "==", user["uid"]).where("pessoal", "==", True).limit(1).stream()
+    for doc in existentes:
+        return doc.id
+
+    orcamento_ref = db.collection("orcamentos").document()
+    orcamento_ref.set({
+        "nome": "Meu espaço",
+        "codigo": gerar_codigo(),
+        "pessoal": True,
+        "criadoPorUid": user["uid"],
+        "criadoPorEmail": user["email"],
+        "criadoEm": datetime.now(timezone.utc),
+    })
+    db.collection("membros").document(membro_doc_id(orcamento_ref.id, user["uid"])).set({
+        "orcamentoId": orcamento_ref.id,
+        "uid": user["uid"],
+        "email": user["email"],
+        "nome": user.get("name", user["email"]),
+        "dataEntrada": datetime.now(timezone.utc),
+    })
+    return orcamento_ref.id
+
+
 @router.get("")
 async def listar_meus_orcamentos(user: dict = Depends(get_current_user)):
+    _garantir_orcamento_pessoal(user)
+
     membros = db.collection("membros").where("uid", "==", user["uid"]).stream()
     ids = [m.to_dict()["orcamentoId"] for m in membros]
 
@@ -72,7 +102,10 @@ async def listar_meus_orcamentos(user: dict = Depends(get_current_user)):
                 "nome": data.get("nome"),
                 "codigo": data.get("codigo"),
                 "criadoPorUid": data.get("criadoPorUid"),
+                "pessoal": data.get("pessoal", False),
             })
+    # o orçamento pessoal sempre vem primeiro na lista
+    resultado.sort(key=lambda o: 0 if o["pessoal"] else 1)
     return {"rows": resultado}
 
 
@@ -100,6 +133,9 @@ async def excluir_orcamento(orcamento_id: str, user: dict = Depends(get_current_
 
     if doc.to_dict().get("criadoPorUid") != user["uid"]:
         raise HTTPException(status_code=403, detail="Só quem criou o orçamento pode excluí-lo.")
+
+    if doc.to_dict().get("pessoal"):
+        raise HTTPException(status_code=403, detail="O orçamento pessoal não pode ser excluído.")
 
     # Limpeza em cascata: gastos, categorias, metas, recorrentes e membros
     for colecao in ("gastos", "categorias", "metas", "recorrentes"):

@@ -150,7 +150,7 @@ export default function App() {
             <Menu size={18} />
           </button>
           <span className="mono eyebrow app-header__title">
-            {filtroId === '' ? 'VISÃO GERAL' : filtro?.nome || 'ORÇAMENTO'}
+            {filtroId === '' ? 'MEU ESPAÇO' : filtro?.nome || 'ORÇAMENTO'}
           </span>
           <div className="app-header__actions">
             <button className="icon-button" onClick={toggleTheme} aria-label="Trocar tema">

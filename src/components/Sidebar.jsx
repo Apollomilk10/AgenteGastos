@@ -83,7 +83,7 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
             onClick={() => handleSelect('')}
           >
             <Layers size={16} />
-            <span className="sidebar__item-name">Visão geral (todos)</span>
+            <span className="sidebar__item-name">Meu espaço</span>
             {filtroId === '' && <Check size={15} />}
           </button>
 
@@ -99,19 +99,24 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
                   className="sidebar__item--clickable sidebar__item-clickarea"
                   onClick={() => handleSelect(orc.id)}
                 >
-                  <Wallet size={16} />
+                  {orc.pessoal ? <User size={16} /> : <Wallet size={16} />}
                   <div className="sidebar__item-main">
-                    <span className="sidebar__item-name">{orc.nome}</span>
-                    <span className="sidebar__item-code mono" onClick={(e) => { e.stopPropagation(); copiarCodigo(orc.codigo); }}>
-                      {copiadoId === orc.codigo ? <Check size={11} /> : <Copy size={11} />}
-                      {orc.codigo}
+                    <span className="sidebar__item-name">
+                      {orc.nome}
+                      {orc.pessoal && <span className="text-muted" style={{ fontWeight: 400 }}> (pessoal)</span>}
                     </span>
+                    {!orc.pessoal && (
+                      <span className="sidebar__item-code mono" onClick={(e) => { e.stopPropagation(); copiarCodigo(orc.codigo); }}>
+                        {copiadoId === orc.codigo ? <Check size={11} /> : <Copy size={11} />}
+                        {orc.codigo}
+                      </span>
+                    )}
                   </div>
                 </button>
 
                 {isActive && <Check size={15} className="sidebar__item-check" />}
 
-                {!isConfirming && (
+                {!isConfirming && !orc.pessoal && (
                   <button
                     className="icon-button"
                     onClick={() => setVendoIntegrantes(orc)}
@@ -121,7 +126,7 @@ export default function Sidebar({ open, onClose, onOpenProfile }) {
                   </button>
                 )}
 
-                {souDono && (
+                {souDono && !orc.pessoal && (
                   isConfirming ? (
                     <div className="confirm-delete">
                       <button

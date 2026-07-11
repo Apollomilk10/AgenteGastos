@@ -67,7 +67,7 @@ export default function OverviewTab({ rows, onSelectCategory }) {
   const saldoInicial = 0;
 
   // orçamento pra recorrentes/metas: o filtrado, ou o único que a pessoa tem
-  const orcamentoAlvo = filtroId || (orcamentos.length === 1 ? orcamentos[0].id : null);
+  const orcamentoAlvo = filtroId || orcamentos.find((o) => o.pessoal)?.id || orcamentos[0]?.id || null;
 
   return (
     <div className="tab-content">

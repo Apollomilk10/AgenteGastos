@@ -297,6 +297,43 @@
   font-weight: 500;
 }
 
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(17, 17, 20, 0.06);
+}
+
+.member-row:last-child {
+  border-bottom: none;
+}
+
+.member-row__nome {
+  font-size: 13.5px;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-row__valores {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+}
+
 .saldo-mensal {
   display: flex;
   flex-direction: column;

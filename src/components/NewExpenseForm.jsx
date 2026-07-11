@@ -28,7 +28,7 @@ function estadoInicial(orcamentos, filtroId, uid) {
     descricao: '',
     etapa: 'nao_especificada',
     responsavel: uid || '',
-    orcamentoId: filtroId || orcamentos[0]?.id || '',
+    orcamentoId: filtroId || orcamentos.find((o) => o.pessoal)?.id || orcamentos[0]?.id || '',
     sugestaoAplicada: false,
     data: hojeISO(),
     frequencia: 'unica', // unica | recorrente
